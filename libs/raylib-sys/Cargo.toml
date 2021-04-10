@@ -1,0 +1,17 @@
+[package]
+name = "raylib-sys"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+edition = "2018"
+build = "build.rs"
+links = "raylib"
+
+[dependencies]
+
+[build-dependencies]
+pkg-config = "0.3"
+bindgen = "0.58"
+
+#[features]
+#static = []
+#dynamic = []
