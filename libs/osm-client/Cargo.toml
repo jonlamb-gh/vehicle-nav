@@ -1,0 +1,16 @@
+[package]
+name = "osm-client"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+err-derive = "0.3"
+url = "2.2"
+bytes = "1"
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["blocking"]

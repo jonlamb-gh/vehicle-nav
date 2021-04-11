@@ -10,7 +10,6 @@ fn main() {
     let title = CString::new("raylib [core] example - basic window").unwrap();
     unsafe {
         InitWindow(screen_width, screen_height, title.as_ptr());
-
         SetTargetFPS(60);
     }
 

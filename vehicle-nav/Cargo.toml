@@ -5,3 +5,12 @@ authors = ["Jon Lamb"]
 edition = "2018"
 
 [dependencies]
+env_logger = "0.8"
+log = "0.4"
+url = "2.2"
+
+[dependencies.osm-client]
+path = "../libs/osm-client"
+
+[dependencies.raylib-sys]
+path = "../libs/raylib-sys"
