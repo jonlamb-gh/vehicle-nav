@@ -2,5 +2,6 @@
 members = [
     "libs/raylib-sys",
     "libs/osm-client",
+    "libs/map-tiler",
     "vehicle-nav",
 ]

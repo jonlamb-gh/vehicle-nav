@@ -9,6 +9,9 @@ env_logger = "0.8"
 log = "0.4"
 url = "2.2"
 
+[dependencies.map-tiler]
+path = "../libs/map-tiler"
+
 [dependencies.osm-client]
 path = "../libs/osm-client"
 

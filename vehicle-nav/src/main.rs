@@ -5,6 +5,12 @@ use std::time::Duration;
 use url::Url;
 
 // raylib examples/textures/textures_image_drawing.c
+//
+// links
+// https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+// https://wiki.openstreetmap.org/wiki/Zoom_levels
+//
+// https://github.com/rinigus/osmscout-server/blob/master/README.api.md
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
@@ -16,8 +22,14 @@ fn main() {
     // in GPU/GL land
     //
     // probably should do the tiling with textures instead of CPU side Pixmap/etc
+    //
+    // draw the base map to the texture
+    // draw attributes/etc on texture, using coordinate transforms from the map-tiler lib
+    // then draw the texture to screen, deal with scale/resize there
+
     let url = Url::parse("http://localhost:8080").unwrap();
     let client = OsmClient::new(url, Duration::from_secs(10));
+
     let png_bytes = client.request_tile(1, 4, 1).unwrap();
     let png_data: &[u8] = &png_bytes;
 

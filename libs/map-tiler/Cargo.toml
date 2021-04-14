@@ -1,0 +1,16 @@
+[package]
+name = "map-tiler"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+err-derive = "0.3"
+tiny-skia = "0.5"
+bytes = "1"
+rayon = "1.5"
+png = "0.16"
+
+[dependencies.osm-client]
+path = "../osm-client"
