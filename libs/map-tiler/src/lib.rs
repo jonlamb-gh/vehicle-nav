@@ -145,7 +145,7 @@ impl MapTiler {
         // TODO - alloc
         let tile_image_results: Vec<Result<Bytes, osm_client::Error>> = tiles
             .par_iter()
-            .map(|c| self.client.request_tile(c.tile_x, c.tile_y, zoom))
+            .map(|c| self.client.request_tile(c.tile_x, c.tile_y, zoom.into()))
             .collect();
 
         for (tile, tile_image_result) in tiles.iter().zip(tile_image_results) {
