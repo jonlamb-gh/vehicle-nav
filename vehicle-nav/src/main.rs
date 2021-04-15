@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use map_tiler::{Config, MapTiler};
 use osm_client::{Daylight, OsmClient, Scale};
 use raylib_sys::*;
@@ -34,7 +36,9 @@ fn main() {
     .unwrap();
 
     let zoom = 11;
-    let pixmap = tiler.request_tiles(47.453551, -116.788118, zoom).unwrap();
+    let pixmap = tiler
+        .request_tiles(47.453551, -116.788118, zoom.into())
+        .unwrap();
     let rgba_bytes = pixmap.data();
 
     //let screen_width = 1024;

@@ -75,11 +75,21 @@ impl Zoom {
     pub fn new_clamped(z: u8) -> Self {
         Zoom(z.clamp(Self::MIN.0, Self::MAX.0))
     }
+
+    pub const fn get(&self) -> u8 {
+        self.0
+    }
 }
 
 impl From<u8> for Zoom {
     fn from(z: u8) -> Self {
         Zoom::new_clamped(z)
+    }
+}
+
+impl From<Zoom> for u8 {
+    fn from(z: Zoom) -> Self {
+        z.0
     }
 }
 

@@ -1,15 +1,13 @@
 //! NOTE: a lot of stuff in here was taken directly from https://crates.io/crates/staticmap
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 use crate::util::*;
 use bytes::Bytes;
 use err_derive::Error;
-use osm_client::OsmClient;
+use osm_client::{OsmClient, Zoom};
 use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
-
-// const TILE_SIZE: usize = 256
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -53,22 +51,22 @@ impl Config {
     }
 }
 
-// API things
-// lat_center: f64,
-// lon_center: f64,
-// zoom: u8
+// TODO - refactor
+#[derive(Debug)]
+struct Coord {
+    tile_x: u32,
+    tile_y: u32,
+    x: i32,
+    y: i32,
+}
 
-// TODO
-// - consider NonZeroU32 for image size
-// - make image w/h be a function of num_tiles(rows, cols), or other way around
-//   * don't do any resize/scaling stuff here
-// - https://github.com/rinigus/osmscout-server/blob/master/README.api.md can do
-//   1024x1024 tiles
 #[derive(Debug)]
 pub struct MapTiler {
     client: OsmClient,
     image: Pixmap,
     config: Config,
+    tiles: Vec<Coord>,
+    tile_image_results: Vec<Result<Bytes, osm_client::Error>>,
 }
 
 impl MapTiler {
@@ -85,18 +83,19 @@ impl MapTiler {
             client,
             image,
             config,
+            tiles: Vec::with_capacity(8),
+            tile_image_results: Vec::with_capacity(8),
         })
     }
 
-    // TODO - rm the debug's
     pub fn request_tiles(
         &mut self,
         lat_center: f64,
         lon_center: f64,
-        zoom: u8,
+        zoom: Zoom,
     ) -> Result<&Pixmap, Error> {
-        let x_center = lon_to_x(lon_center, zoom);
-        let y_center = lat_to_y(lat_center, zoom);
+        let x_center = lon_to_x(lon_center, zoom.get());
+        let y_center = lat_to_y(lat_center, zoom.get());
 
         let x_min = (x_center - (0.5 * self.config.width as f64 / self.config.tile_size as f64))
             .floor() as i32;
@@ -107,32 +106,14 @@ impl MapTiler {
         let y_max = (y_center + (0.5 * self.config.height as f64 / self.config.tile_size as f64))
             .ceil() as i32;
 
-        log::info!("x_center {}", x_center);
-        log::info!("y_center {}", y_center);
-        log::info!("x_min = {}", x_min);
-        log::info!("x_max = {}", x_max);
-        log::info!("y_min = {}", y_min);
-        log::info!("y_max = {}", y_max);
+        let max_tile: i32 = 2i32.pow(zoom.get() as u32);
 
-        let max_tile: i32 = 2i32.pow(zoom as u32);
-        log::info!("max_tile = {}", max_tile);
-
-        // TODO - refactor
-        struct Coord {
-            tile_x: u32,
-            tile_y: u32,
-            x: i32,
-            y: i32,
-        }
-
-        // TODO - collapse this, pre-allocate the dynamic stuff
-        let mut tiles: Vec<Coord> = Vec::new();
+        self.tiles.clear();
         for x in x_min..x_max {
             for y in y_min..y_max {
                 let tile_x: i32 = (x + max_tile) % max_tile;
                 let tile_y: i32 = (y + max_tile) % max_tile;
-                log::info!("req tile x={}, y={}, x={}, y={}", tile_x, tile_y, x, y);
-                tiles.push(Coord {
+                self.tiles.push(Coord {
                     tile_x: tile_x as u32,
                     tile_y: tile_y as u32,
                     x,
@@ -140,15 +121,15 @@ impl MapTiler {
                 });
             }
         }
-        log::info!("num_tiles {}", tiles.len());
 
-        // TODO - alloc
-        let tile_image_results: Vec<Result<Bytes, osm_client::Error>> = tiles
+        self.tile_image_results.clear();
+        self.tile_image_results = self
+            .tiles
             .par_iter()
-            .map(|c| self.client.request_tile(c.tile_x, c.tile_y, zoom.into()))
+            .map(|c| self.client.request_tile(c.tile_x, c.tile_y, zoom))
             .collect();
 
-        for (tile, tile_image_result) in tiles.iter().zip(tile_image_results) {
+        for (tile, tile_image_result) in self.tiles.iter().zip(self.tile_image_results.drain(..)) {
             let tile_image = tile_image_result?;
             let (x, y) = (tile.x, tile.y);
             let (x_px, y_px) = (
@@ -157,14 +138,6 @@ impl MapTiler {
             );
 
             let pixmap = Pixmap::decode_png(&tile_image)?;
-            log::info!(
-                "tile pixmap (w={}, h={}) @ pixel (x={}, y={})",
-                pixmap.width(),
-                pixmap.height(),
-                x_px,
-                y_px
-            );
-
             self.image.draw_pixmap(
                 x_px as i32,
                 y_px as i32,
