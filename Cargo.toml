@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "libs/raylib-sys",
+    "libs/raylib",
     "libs/osm-client",
     "libs/map-tiler",
     "vehicle-nav",

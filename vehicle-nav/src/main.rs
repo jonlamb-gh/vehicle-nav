@@ -2,18 +2,23 @@
 
 use map_tiler::{Config, MapTiler};
 use osm_client::{Daylight, OsmClient, Scale};
-use raylib_sys::*;
-use std::ffi::CString;
+use raylib::prelude::*;
 use url::Url;
 //use std::time::Duration;
 
-// raylib examples/textures/textures_image_drawing.c
-//
 // links
 // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
 // https://wiki.openstreetmap.org/wiki/Zoom_levels
 //
 // https://github.com/rinigus/osmscout-server/blob/master/README.api.md
+
+// TODO
+// - config crate, toml file
+//   * table sections: window, maps/tiler, tile_server.url/etc
+//   * startup lat/lon, day/night
+//   * tile_size or map_scale
+//   * max_drawn_route_waypoints
+// - cli opts
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
@@ -21,6 +26,7 @@ fn main() {
     //let url = Url::parse("http://localhost:8080").unwrap();
     let url = Url::parse("http://127.0.0.1:8553/v1/tile").unwrap();
     // TODO - with_timeout
+    // add setter methods for changing at runtime
     let client = OsmClient::new(url)
         .with_daylight(Daylight::Day)
         .with_scale(Scale::Four);
@@ -36,44 +42,37 @@ fn main() {
     .unwrap();
 
     let zoom = 11;
-    let pixmap = tiler
+    let tile_pixmap = tiler
         .request_tiles(47.453551, -116.788118, zoom.into())
         .unwrap();
-    let rgba_bytes = pixmap.data();
 
-    //let screen_width = 1024;
-    //let screen_height = 1024;
-    let screen_width = 800 + 200;
-    let screen_height = 600 + 200;
+    let screen_width = 1024;
+    let screen_height = 1024;
+    //let screen_width = 800 + 200;
+    //let screen_height = 600 + 200;
 
-    let title = CString::new("raylib [core] example - basic window").unwrap();
-    unsafe {
-        InitWindow(screen_width, screen_height, title.as_ptr());
-        SetTargetFPS(60);
-    }
+    let (mut rl, rl_t) = RaylibBuilder::default()
+        .width(screen_width)
+        .height(screen_height)
+        .title("VehicleNAV")
+        .build();
 
-    let image = unsafe {
-        let src_img = Image {
-            data: rgba_bytes.as_ptr() as *mut _, // Should be used read-only just for ImageCopy
-            width: 1024,
-            height: 1024,
-            mipmaps: 1,
-            format: PixelFormat::PIXELFORMAT_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as _,
-        };
-        let mut img = ImageCopy(src_img);
-        ImageResize(&mut img, screen_width, screen_height);
-        img
-    };
-    let tile_texture = unsafe { LoadTextureFromImage(image) };
+    rl.set_target_fps(60);
+    // rl.get_frame_time()
 
-    let bg_color = Color {
+    let mut tile_image = Image::from(tile_pixmap);
+    tile_image.resize(screen_width, screen_height);
+
+    let tile_texture = Texture2D::from(tile_image);
+
+    let bg_color = ffi::Color {
         r: 255,
         g: 255,
         b: 255,
         a: 255,
     };
 
-    let white = Color {
+    let white = ffi::Color {
         r: 255,
         g: 255,
         b: 255,
@@ -81,29 +80,27 @@ fn main() {
     };
 
     loop {
-        unsafe {
-            if WindowShouldClose() {
-                break;
-            }
-
-            BeginDrawing();
-
-            ClearBackground(bg_color);
-
-            DrawTexture(
-                tile_texture,
-                screen_width / 2 - tile_texture.width / 2,
-                screen_height / 2 - tile_texture.height / 2,
-                white,
-            );
-
-            EndDrawing();
+        if rl.window_should_close() {
+            break;
         }
-    }
 
-    unsafe {
-        UnloadTexture(tile_texture);
+        /*
+        // TODO - use dir keys to move center lat/lon
+        // use asdf to move origin around with path waypoints
+        if IsKeyDown(KeyboardKey::KEY_RIGHT as _) {
+            println!("right");
+        }
+        */
 
-        CloseWindow();
+        let mut dh = rl.begin_drawing(&rl_t);
+
+        dh.clear_background(bg_color);
+
+        dh.draw_texture(
+            &tile_texture,
+            screen_width / 2 - tile_texture.width / 2,
+            screen_height / 2 - tile_texture.height / 2,
+            white,
+        );
     }
 }

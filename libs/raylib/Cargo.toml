@@ -1,0 +1,11 @@
+[package]
+name = "raylib"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+edition = "2018"
+
+[dependencies]
+tiny-skia = "0.5"
+
+[dependencies.raylib-sys]
+path = "../raylib-sys"

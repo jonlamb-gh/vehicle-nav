@@ -15,5 +15,5 @@ path = "../libs/map-tiler"
 [dependencies.osm-client]
 path = "../libs/osm-client"
 
-[dependencies.raylib-sys]
-path = "../libs/raylib-sys"
+[dependencies.raylib]
+path = "../libs/raylib"

@@ -722,6 +722,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raylib"
+version = "0.1.0"
+dependencies = [
+ "raylib-sys",
+ "tiny-skia",
+]
+
+[[package]]
 name = "raylib-sys"
 version = "3.5.0"
 dependencies = [
@@ -1079,7 +1087,7 @@ dependencies = [
  "log",
  "map-tiler",
  "osm-client",
- "raylib-sys",
+ "raylib",
  "url",
 ]
 
