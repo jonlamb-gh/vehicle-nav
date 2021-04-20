@@ -1,11 +1,16 @@
-use crate::ffi;
+use crate::core::{RaylibHandle, RaylibThread};
+use crate::{error::Error, ffi};
 use std::convert::TryInto;
+use std::ffi::CString;
 use tiny_skia::Pixmap;
 
 make_thin_wrapper!(Image, ffi::Image, ffi::UnloadImage);
 make_thin_wrapper!(Texture2D, ffi::Texture2D, ffi::UnloadTexture);
 
 // TODO - cleanup bindgen PixelFormat, remove the PIXELFORMAT_ prefix on enum
+// - add a common Error enum type, things like load_texture_from_image return string error,
+// refactor it
+// - consider giving Image Send blessing, should be ok
 
 impl Image {
     pub fn width(&self) -> i32 {
@@ -65,12 +70,28 @@ impl From<&Pixmap> for Image {
     }
 }
 
-impl From<Image> for Texture2D {
-    fn from(image: Image) -> Self {
-        unsafe {
-            let ffi_texture = ffi::LoadTextureFromImage(image.0);
-            Texture2D::from_raw(ffi_texture)
+impl RaylibHandle {
+    /// Loads texture from file into GPU memory (VRAM).
+    pub fn load_texture(&mut self, _: &RaylibThread, filename: &str) -> Result<Texture2D, Error> {
+        let c_filename = CString::new(filename).unwrap();
+        let t = unsafe { ffi::LoadTexture(c_filename.as_ptr()) };
+        if t.id == 0 {
+            return Err(Error::TextureLoadFromFile(filename.to_string()));
         }
-        // Drop the image
+        Ok(Texture2D(t))
+    }
+
+    /// Loads texture from image data.
+    #[inline]
+    pub fn load_texture_from_image(
+        &mut self,
+        _: &RaylibThread,
+        image: &Image,
+    ) -> Result<Texture2D, String> {
+        let t = unsafe { ffi::LoadTextureFromImage(image.0) };
+        if t.id == 0 {
+            return Err("failed to load image as a texture.".to_string()); // TODO - error type
+        }
+        Ok(Texture2D(t))
     }
 }

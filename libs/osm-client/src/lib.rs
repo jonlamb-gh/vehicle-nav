@@ -13,6 +13,9 @@
 use bytes::Bytes;
 use err_derive::Error;
 use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 use std::time::Duration;
 use url::Url;
 
@@ -29,8 +32,12 @@ pub enum Error {
     ParseResponseBytes(reqwest::Error),
 }
 
+#[derive(Debug, Error)]
+#[error(display = "Failed to parse scale")]
+pub struct ScaleParseError;
+
 /// Size of a tile in pixels is scale * 256
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
 pub enum Scale {
     /// x1 == 256 tile size
     One,
@@ -38,6 +45,16 @@ pub enum Scale {
     Two,
     /// x5 == 1024 tile size
     Four,
+}
+
+impl Scale {
+    pub fn tile_size(&self) -> u32 {
+        match self {
+            Scale::One => 256,
+            Scale::Two => 512,
+            Scale::Four => 1024,
+        }
+    }
 }
 
 impl Scale {
@@ -50,7 +67,24 @@ impl Scale {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+impl FromStr for Scale {
+    type Err = ScaleParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1" => Ok(Scale::One),
+            "2" => Ok(Scale::Two),
+            "4" => Ok(Scale::Four),
+            _ => Err(ScaleParseError),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(display = "Failed to parse daylight")]
+pub struct DaylighParseError;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
 pub enum Daylight {
     Night,
     Day,
@@ -65,7 +99,19 @@ impl Daylight {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+impl FromStr for Daylight {
+    type Err = DaylighParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "night" => Ok(Daylight::Night),
+            "day" => Ok(Daylight::Day),
+            _ => Err(DaylighParseError),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
 pub struct Zoom(u8);
 
 impl Zoom {
@@ -90,6 +136,20 @@ impl From<u8> for Zoom {
 impl From<Zoom> for u8 {
     fn from(z: Zoom) -> Self {
         z.0
+    }
+}
+
+impl FromStr for Zoom {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Zoom::new_clamped(s.parse::<u8>()?))
+    }
+}
+
+impl fmt::Display for Zoom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

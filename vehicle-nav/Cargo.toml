@@ -7,7 +7,11 @@ edition = "2018"
 [dependencies]
 env_logger = "0.8"
 log = "0.4"
-url = "2.2"
+structopt = "0.3"
+exitcode = "1.1"
+err-derive = "0.3"
+crossbeam = "0.8"
+tiny-skia = "0.5"
 
 [dependencies.map-tiler]
 path = "../libs/map-tiler"
@@ -17,3 +21,6 @@ path = "../libs/osm-client"
 
 [dependencies.raylib]
 path = "../libs/raylib"
+
+[dependencies.config]
+path = "../libs/config"

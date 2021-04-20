@@ -1,0 +1,21 @@
+name = "sample config"
+
+[window]
+title = "VehicleNAV"
+width = 800
+height = 600
+target_fps = 60
+
+[tiler]
+url = "http://127.0.0.1:8553/v1/tile"
+scale = "Four"
+support_daynight = true
+
+[imu-gps]
+mount_location = [0, 0, 0]
+
+[startup-defaults]
+daynight = "Day"
+lat = 47.453551
+lon = -116.788118
+zoom = 11

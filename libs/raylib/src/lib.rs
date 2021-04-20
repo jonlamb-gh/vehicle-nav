@@ -3,6 +3,7 @@
 #![deny(warnings)]
 
 pub mod core;
+pub mod error;
 pub mod prelude;
 
 pub mod ffi {

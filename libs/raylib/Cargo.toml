@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 tiny-skia = "0.5"
+err-derive = "0.3"
 
 [dependencies.raylib-sys]
 path = "../raylib-sys"
