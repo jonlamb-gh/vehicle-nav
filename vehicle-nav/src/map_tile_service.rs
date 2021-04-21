@@ -3,7 +3,7 @@ use config::Config;
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
 use err_derive::Error;
 use map_tiler::{Config as MapTilerConfig, MapTiler};
-use osm_client::{Daylight, OsmClient, Scale, Zoom};
+use osm_client::{OsmClient, Scale, Zoom};
 use std::io;
 use tiny_skia::Pixmap;
 
@@ -82,16 +82,24 @@ pub struct MapTileService {
 
 impl MapTileService {
     fn new(config: Config, resp_sender: Sender<GetTilesResponse>) -> Result<Self, Error> {
-        // TODO - use config to build up things
-        let client = OsmClient::new(config.tiler.url)
-            .with_daylight(Daylight::Day)
-            .with_scale(Scale::Four);
+        let mut client = OsmClient::new(config.tiler.url);
+        if config.tiler.support_daynight {
+            client.set_daylight(config.startup_defaults.daynight);
+        }
+        if let Some(scale) = config.tiler.scale {
+            client.set_scale(scale);
+        }
+        let tile_size = config
+            .tiler
+            .scale
+            .map(|s| s.tile_size())
+            .unwrap_or_else(|| Scale::default().tile_size());
         let map_tiler = MapTiler::new(
             client,
             MapTilerConfig {
                 width: config.window.width.into(),
                 height: config.window.height.into(),
-                tile_size: 1024, // TODO - config
+                tile_size,
             },
         )?;
         Ok(MapTileService {
@@ -122,6 +130,7 @@ impl MapTileService {
 
 impl ShutdownHandlingThread for MapTileService {
     type Msg = GetTilesRequest;
+    // TODO - just use String type once tolerable error cases are figured out
     type ShutdownError = Error;
 
     fn handle_requests(&mut self, requests: Vec<Self::Msg>) -> Result<(), Self::ShutdownError> {

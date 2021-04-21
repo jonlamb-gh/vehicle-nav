@@ -47,6 +47,12 @@ pub enum Scale {
     Four,
 }
 
+impl Default for Scale {
+    fn default() -> Self {
+        Scale::One
+    }
+}
+
 impl Scale {
     pub fn tile_size(&self) -> u32 {
         match self {
@@ -179,8 +185,8 @@ impl OsmClient {
         self
     }
 
-    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
-        self.timeout = timeout;
+    pub fn set_timeout<T: Into<Option<Duration>>>(&mut self, timeout: T) {
+        self.timeout = timeout.into();
     }
 
     pub fn with_scale(mut self, scale: Scale) -> Self {
@@ -188,8 +194,8 @@ impl OsmClient {
         self
     }
 
-    pub fn set_scale(&mut self, scale: Option<Scale>) {
-        self.scale = scale;
+    pub fn set_scale<T: Into<Option<Scale>>>(&mut self, scale: T) {
+        self.scale = scale.into();
         self.update_base_url_query_pairs();
     }
 
@@ -198,8 +204,8 @@ impl OsmClient {
         self
     }
 
-    pub fn set_daylight(&mut self, daylight: Option<Daylight>) {
-        self.daylight = daylight;
+    pub fn set_daylight<T: Into<Option<Daylight>>>(&mut self, daylight: T) {
+        self.daylight = daylight.into();
         self.update_base_url_query_pairs();
     }
 

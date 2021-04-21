@@ -48,7 +48,10 @@ pub struct Config {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Tiler {
     pub url: Url,
-    /// Determines tile_size, default is 256 if not provided
+    /// Determines tile_size, default is 256 if scale not provided/supported
+    /// "1" => 256
+    /// "2" => 512
+    /// "4" => 1024
     #[serde(default)]
     pub scale: Option<osm_client::Scale>,
     #[serde(default)]

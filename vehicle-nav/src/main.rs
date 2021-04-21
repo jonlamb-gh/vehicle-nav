@@ -41,7 +41,7 @@ mod thread;
 // knows how to draw features/waypoints/etc on the texture
 // deals with user input event management
 
-// MapTileService, thread
+// MapTileService thread
 // owns MapTiler
 // deals with requests
 // yields a new Image (Image->Texture2D done in main thread)
@@ -49,12 +49,12 @@ mod thread;
 // req/resp is async, main will check each iter if a new response recvd/ready
 // req has center lat/lon and zoom
 
-// SensorService, thread
+// SensorService thread
 // IMU/GPS serial driver
 // takes config as setup
 // yields structured IMU and GPS data
 
-// StorageService, thread
+// StorageService thread
 // deals with the sqlite read/write
 // should eventually use the cipher/encryption features
 // waypoints/routes/sensor-data/etc
