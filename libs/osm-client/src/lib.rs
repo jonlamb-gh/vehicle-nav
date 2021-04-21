@@ -175,20 +175,32 @@ impl OsmClient {
     }
 
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
+        self.set_timeout(Some(timeout));
         self
+    }
+
+    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+        self.timeout = timeout;
     }
 
     pub fn with_scale(mut self, scale: Scale) -> Self {
-        self.scale = Some(scale);
-        self.update_base_url_query_pairs();
+        self.set_scale(Some(scale));
         self
     }
 
-    pub fn with_daylight(mut self, daylight: Daylight) -> Self {
-        self.daylight = Some(daylight);
+    pub fn set_scale(&mut self, scale: Option<Scale>) {
+        self.scale = scale;
         self.update_base_url_query_pairs();
+    }
+
+    pub fn with_daylight(mut self, daylight: Daylight) -> Self {
+        self.set_daylight(Some(daylight));
         self
+    }
+
+    pub fn set_daylight(&mut self, daylight: Option<Daylight>) {
+        self.daylight = daylight;
+        self.update_base_url_query_pairs();
     }
 
     // TODO - newtype units
@@ -214,20 +226,6 @@ impl OsmClient {
         let bytes = resp.bytes().map_err(Error::ParseResponseBytes)?;
         Ok(bytes)
     }
-
-    /*
-    pub fn request_tile(&self, x: u32, y: u32, zoom: u8) -> Result<Bytes, Error> {
-        let z = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
-        let suffix = format!("{}/{}/{}.png", z, x, y);
-        let url = self.server_url.join(&suffix).map_err(Error::UrlParse)?;
-        let req = self.client.get(url).timeout(self.timeout);
-        log::debug!("Sending tile request {:?}", req);
-        let resp = req.send().map_err(Error::Request)?;
-        log::debug!("Received tile response {:?}", resp);
-        let bytes = resp.bytes().map_err(Error::ParseResponseBytes)?;
-        Ok(bytes)
-    }
-    */
 
     fn update_base_url_query_pairs(&mut self) {
         self.server_url.query_pairs_mut().clear();

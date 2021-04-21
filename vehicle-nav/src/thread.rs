@@ -126,7 +126,7 @@ pub trait ShutdownHandlingThread {
         Ok(())
     }
 
-    /// Stuff to do before thread shutdown
+    /// Stuff to do in the thread before thread shutdown
     fn pre_shutdown(&mut self) {}
 
     /// Returning an error will shutdown the thread

@@ -8,9 +8,8 @@ use std::io;
 use tiny_skia::Pixmap;
 
 // https://docs.rs/crossbeam/0.8.0/crossbeam/channel/index.html
-// TODO
-// - traits and boxed stuff, client newtype over Sender
-// - multiple recvrs, one for tiles, another for config stuff, use crossbeam select utils
+// - multiple recvrs, one for tiles, another for config stuff?
+// - or just extra optional fields in request
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -83,7 +82,7 @@ pub struct MapTileService {
 
 impl MapTileService {
     fn new(config: Config, resp_sender: Sender<GetTilesResponse>) -> Result<Self, Error> {
-        // TODO - use config
+        // TODO - use config to build up things
         let client = OsmClient::new(config.tiler.url)
             .with_daylight(Daylight::Day)
             .with_scale(Scale::Four);
@@ -130,6 +129,7 @@ impl ShutdownHandlingThread for MapTileService {
             // TODO - consider revising this to not shutdown on all errors, some things are
             // tolerable
             // - server timeout/not up yet stuff is ok, just retry
+            // - put a result in the response
             let resp = self.process_tile_request(req)?;
             self.resp_sender
                 .send(resp)

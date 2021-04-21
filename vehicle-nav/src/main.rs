@@ -1,16 +1,22 @@
 //#![deny(warnings)]
 
+use crate::gui_resources::GuiResources;
 use crate::map_tile_service::MapTileService;
 use crate::opts::Opts;
 use config::Config;
-use map_tiler::{Config as MapTilerConfig, MapTiler};
-use osm_client::{Daylight, OsmClient, Scale};
 use raylib::prelude::*;
 use std::process;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use structopt::StructOpt;
 
+//use osm_client::{Daylight, OsmClient, Scale};
+//use map_tiler::{Config as MapTilerConfig, MapTiler};
 //use std::time::Duration;
 
+mod gui_resources;
 mod map_tile_service;
 mod opts;
 mod thread;
@@ -24,13 +30,10 @@ mod thread;
 // TODO
 // - config crate, toml file
 //   * use the newtypes from the other crates for basic sanity checking
-//   * table sections: window, maps/tiler, tile_server.url/etc
-//   * startup lat/lon, day/night
-//   * tile_size or map_scale
-//   * imu table, mount location/rotation/alignment stuff
-//   * max_drawn_route_waypoints
-// - cli opts
-// - make a proper error type in lib/raylib, rm the string errors
+//   * max_rendered_route_waypoints
+//   * add client timeout
+// - cli opts accept env vars
+//
 
 // main
 // does all the GUI stuff with raylib
@@ -56,20 +59,6 @@ mod thread;
 // should eventually use the cipher/encryption features
 // waypoints/routes/sensor-data/etc
 
-const BG_COLOR: ffi::Color = ffi::Color {
-    r: 0,
-    g: 0,
-    b: 0,
-    a: 255,
-};
-
-const MAP_TEXTURE_COLOR: ffi::Color = ffi::Color {
-    r: 255,
-    g: 255,
-    b: 255,
-    a: 255,
-};
-
 fn main() {
     match do_main() {
         Ok(()) => (),
@@ -91,46 +80,22 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    let running = Arc::new(AtomicUsize::new(0));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        let prev = r.fetch_add(1, Ordering::SeqCst);
+        if prev == 0 {
+            log::debug!("Shutting down");
+        } else {
+            log::warn!("Forcing exit");
+            process::exit(exitcode::SOFTWARE);
+        }
+    })?;
+
     let config = Config::load(&opts.config)?;
 
     let (map_client, map_shutdown_handle) = MapTileService::start(config.clone())?;
 
-    let mut map_texture = None;
-
-    /*
-    map_client.request(
-        config.startup_defaults.lat,
-        config.startup_defaults.lon,
-        config.startup_defaults.zoom,
-    )?;
-    */
-
-    // TODO - with_timeout, add timeout (seconds) to Config
-    // add setter methods for changing at runtime
-    // TODO - use the config items
-    /*
-    let client = OsmClient::new(config.tiler.url)
-        .with_daylight(Daylight::Day)
-        .with_scale(Scale::Four);
-
-    let mut tiler = MapTiler::new(
-        client,
-        MapTilerConfig {
-            width: config.window.width.into(),
-            height: config.window.height.into(),
-            tile_size: 1024, // TODO - config
-        },
-    )?;
-
-    let tile_pixmap = tiler.request_tiles(
-        config.startup_defaults.lat,
-        config.startup_defaults.lon,
-        config.startup_defaults.zoom,
-    )?;
-    */
-
-    //let screen_width = 1024;
-    //let screen_height = 1024;
     let screen_width = config.window.width.into();
     let screen_height = config.window.height.into();
 
@@ -143,21 +108,18 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     rl.set_target_fps(config.window.target_fps.into());
     // rl.get_frame_time()
 
-    /*
-    let mut tile_image = Image::from(tile_pixmap);
-    tile_image.resize(screen_width, screen_height);
+    let mut resources = GuiResources::load(&mut rl, &rl_t)?;
 
-    let tile_texture = rl.load_texture_from_image(&rl_t, &tile_image)?;
-    */
-
-    // TODO - also setup control-c/sig handler
     loop {
-        if rl.window_should_close() {
+        let should_close = running.load(Ordering::SeqCst) != 0 || rl.window_should_close();
+        if should_close {
             break;
         }
 
-        if rl.is_key_released(ffi::KeyboardKey::KEY_M) {
-            println!("M key released, request tiles");
+        // TODO - use arrow keys to move center lat/lon
+        // use asdf to move origin around with path waypoints
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_M) {
+            log::debug!("M key pressed, requesting tiles");
             map_client.request(
                 config.startup_defaults.lat,
                 config.startup_defaults.lon,
@@ -165,47 +127,35 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
         }
 
-        /*
-        // TODO - use dir keys to move center lat/lon
-        // use asdf to move origin around with path waypoints
-        if IsKeyDown(KeyboardKey::KEY_RIGHT as _) {
-            println!("right");
-        }
-        */
-
         if let Some(map_pixmap) = map_client.try_recv()? {
             log::debug!("Got pixmap");
             let mut map_image = Image::from(&map_pixmap);
             map_image.resize(screen_width, screen_height);
-            map_texture = Some(rl.load_texture_from_image(&rl_t, &map_image)?);
+            let _ = resources
+                .map_texture
+                .replace(rl.load_texture_from_image(&rl_t, &map_image)?);
         }
 
         let mut dh = rl.begin_drawing(&rl_t);
 
-        dh.clear_background(BG_COLOR);
+        dh.clear_background(GuiResources::BG_COLOR);
 
-        if let Some(t) = &map_texture {
-            dh.draw_texture(
-                t,
-                screen_width / 2 - t.width / 2,
-                screen_height / 2 - t.height / 2,
-                MAP_TEXTURE_COLOR,
-            );
-        }
+        let foreground_texture = match &resources.map_texture {
+            Some(map_texture) => map_texture,
+            None => &resources.background_texture,
+        };
+
+        dh.draw_texture(
+            foreground_texture,
+            screen_width / 2 - foreground_texture.width / 2,
+            screen_height / 2 - foreground_texture.height / 2,
+            GuiResources::MAP_TEXTURE_COLOR,
+        );
     }
 
     map_shutdown_handle.blocking_shutdown()?;
 
-    // TODO - doing this make the texture drop correctly and doesn't segfault
-    // FIXME
-    // otherwise, it seems to get dropped in the wrong order / too late?
-    let _t = map_texture.take();
-
     log::debug!("Shutdown complete");
-
-    // TODO - segfaulting again
-    // INFO: Window closed successfully
-    // Segmentation fault (core dumped)
 
     Ok(())
 }
