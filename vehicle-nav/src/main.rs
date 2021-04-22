@@ -3,6 +3,7 @@
 use crate::gui_resources::GuiResources;
 use crate::map_tile_service::MapTileService;
 use crate::opts::Opts;
+use common::Coordinate;
 use config::Config;
 use raylib::prelude::*;
 use std::process;
@@ -30,9 +31,11 @@ mod thread;
 // TODO
 // - config crate, toml file
 //   * use the newtypes from the other crates for basic sanity checking
-//   * max_rendered_route_waypoints
+//   * max_rendered_route_waypoints/lines
 //   * add client timeout
+//   * line color(s)
 // - cli opts accept env vars
+// - add a Coordinate (lat/lon) type, with coordinate transform helpers
 //
 
 // main
@@ -108,6 +111,11 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     rl.set_target_fps(config.window.target_fps.into());
     // rl.get_frame_time()
 
+    let mut zoom = config.startup_defaults.zoom;
+    let mut center_coord = Coordinate::from((
+        config.startup_defaults.latitude,
+        config.startup_defaults.longitude,
+    ));
     let mut resources = GuiResources::load(&mut rl, &rl_t)?;
 
     loop {
@@ -118,13 +126,36 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
         // TODO - use arrow keys to move center lat/lon
         // use asdf to move origin around with path waypoints
+        // maybe add a helper method on Coordinate, for shift/inc/dec stuff
+        // also add saturating_add/sub with clamps
+        // coord shift is a function of zoom, constant distince in pixels
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_M) {
             log::debug!("M key pressed, requesting tiles");
-            map_client.request(
-                config.startup_defaults.lat,
-                config.startup_defaults.lon,
-                config.startup_defaults.zoom,
-            )?;
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_UP) {
+            center_coord.latitude.saturating_add(0.001);
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_DOWN) {
+            center_coord.latitude.saturating_sub(0.001);
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_RIGHT) {
+            center_coord.longitude.saturating_add(0.001);
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_LEFT) {
+            center_coord.longitude.saturating_sub(0.001);
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_I) {
+            zoom.increment();
+            map_client.request(center_coord, zoom)?;
+        }
+        if rl.is_key_pressed(ffi::KeyboardKey::KEY_O) {
+            zoom.decrement();
+            map_client.request(center_coord, zoom)?;
         }
 
         if let Some(map_pixmap) = map_client.try_recv()? {
@@ -151,6 +182,13 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
             screen_height / 2 - foreground_texture.height / 2,
             GuiResources::MAP_TEXTURE_COLOR,
         );
+
+        // TODO - test out some texture drawing
+        // DrawLine*
+        // DrawLineStrip
+        // probably the Vector2 variants, need to check the coordinate space texture or screen?
+
+        dh.draw_fps(screen_width / 2, screen_height / 2);
     }
 
     map_shutdown_handle.blocking_shutdown()?;

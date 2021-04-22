@@ -14,3 +14,6 @@ png = "0.16"
 
 [dependencies.osm-client]
 path = "../osm-client"
+
+[dependencies.common]
+path = "../common"

@@ -1,9 +1,10 @@
 use crate::thread::{SendRecvError, ShutdownHandle, ShutdownHandlingThread};
+use common::{Coordinate, Scale, Zoom};
 use config::Config;
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
 use err_derive::Error;
 use map_tiler::{Config as MapTilerConfig, MapTiler};
-use osm_client::{OsmClient, Scale, Zoom};
+use osm_client::OsmClient;
 use std::io;
 use tiny_skia::Pixmap;
 
@@ -25,8 +26,7 @@ pub enum Error {
 
 #[derive(Debug)]
 pub struct GetTilesRequest {
-    pub lat: f64,
-    pub lon: f64,
+    pub center: Coordinate,
     pub zoom: Zoom,
 }
 
@@ -55,10 +55,15 @@ impl MapTileServiceClient {
     }
 
     // TODO consider the try_send with timeout
-    pub fn request(&self, lat: f64, lon: f64, zoom: Zoom) -> Result<(), Error> {
-        log::debug!("Request tiles {}, {}, {}", lat, lon, zoom);
+    pub fn request(&self, center: Coordinate, zoom: Zoom) -> Result<(), Error> {
+        log::debug!(
+            "Request tiles {}, {}, {}",
+            center.latitude,
+            center.longitude,
+            zoom
+        );
         self.req_sender
-            .send(GetTilesRequest { lat, lon, zoom })
+            .send(GetTilesRequest { center, zoom })
             .map_err(SendRecvError::from)?;
         Ok(())
     }
@@ -120,10 +125,7 @@ impl MapTileService {
     }
 
     fn process_tile_request(&mut self, req: GetTilesRequest) -> Result<GetTilesResponse, Error> {
-        let image = self
-            .map_tiler
-            .request_tiles(req.lat, req.lon, req.zoom)?
-            .clone();
+        let image = self.map_tiler.request_tiles(req.center, req.zoom)?.clone();
         Ok(GetTilesResponse { image })
     }
 }

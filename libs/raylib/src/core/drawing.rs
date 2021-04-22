@@ -53,4 +53,39 @@ pub trait RaylibDraw {
             ffi::DrawTexture(*texture.as_ref(), x, y, tint.into());
         }
     }
+
+    /// Draws a line.
+    #[inline]
+    fn draw_line(
+        &mut self,
+        start_pos_x: i32,
+        start_pos_y: i32,
+        end_pos_x: i32,
+        end_pos_y: i32,
+        color: impl Into<ffi::Color>,
+    ) {
+        unsafe {
+            ffi::DrawLine(start_pos_x, start_pos_y, end_pos_x, end_pos_y, color.into());
+        }
+    }
+
+    /// Draw lines sequence
+    #[inline]
+    fn draw_line_strip(&mut self, points: &[ffi::Vector2], color: impl Into<ffi::Color>) {
+        unsafe {
+            ffi::DrawLineStrip(
+                points.as_ptr() as *mut ffi::Vector2,
+                points.len() as i32,
+                color.into(),
+            );
+        }
+    }
+
+    /// Shows current FPS.
+    #[inline]
+    fn draw_fps(&mut self, x: i32, y: i32) {
+        unsafe {
+            ffi::DrawFPS(x, y);
+        }
+    }
 }

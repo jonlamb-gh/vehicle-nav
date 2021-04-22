@@ -16,6 +16,6 @@ mount_location = [0, 0, 0]
 
 [startup-defaults]
 daynight = "Day"
-lat = 47.453551
-lon = -116.788118
 zoom = 11
+latitude = 47.453551
+longitude = -116.788118

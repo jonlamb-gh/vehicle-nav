@@ -17,6 +17,9 @@ tiny-skia = "0.5"
 version = "3.1"
 features=["termination"]
 
+[dependencies.common]
+path = "../libs/common"
+
 [dependencies.map-tiler]
 path = "../libs/map-tiler"
 

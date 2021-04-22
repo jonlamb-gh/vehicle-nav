@@ -169,13 +169,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "err-derive",
+ "serde",
+]
+
+[[package]]
 name = "config"
 version = "0.1.0"
 dependencies = [
  "approx",
+ "common",
  "err-derive",
  "log",
- "osm-client",
  "serde",
  "toml",
  "url",
@@ -588,6 +596,7 @@ name = "map-tiler"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "common",
  "err-derive",
  "log",
  "osm-client",
@@ -709,10 +718,10 @@ name = "osm-client"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "common",
  "err-derive",
  "log",
  "reqwest",
- "serde",
  "url",
 ]
 
@@ -1237,6 +1246,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "vehicle-nav"
 version = "0.1.0"
 dependencies = [
+ "common",
  "config",
  "crossbeam",
  "ctrlc",

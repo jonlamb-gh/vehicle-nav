@@ -4,8 +4,9 @@
 
 use crate::util::*;
 use bytes::Bytes;
+use common::{Coordinate, Zoom};
 use err_derive::Error;
-use osm_client::{OsmClient, Zoom};
+use osm_client::OsmClient;
 use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
 
@@ -88,14 +89,9 @@ impl MapTiler {
         })
     }
 
-    pub fn request_tiles(
-        &mut self,
-        lat_center: f64,
-        lon_center: f64,
-        zoom: Zoom,
-    ) -> Result<&Pixmap, Error> {
-        let x_center = lon_to_x(lon_center, zoom.get());
-        let y_center = lat_to_y(lat_center, zoom.get());
+    pub fn request_tiles(&mut self, center: Coordinate, zoom: Zoom) -> Result<&Pixmap, Error> {
+        let x_center = lon_to_x(center.longitude.into(), zoom.get());
+        let y_center = lat_to_y(center.latitude.into(), zoom.get());
 
         let x_min = (x_center - (0.5 * self.config.width as f64 / self.config.tile_size as f64))
             .floor() as i32;

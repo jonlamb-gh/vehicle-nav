@@ -11,11 +11,9 @@
 #![deny(warnings)]
 
 use bytes::Bytes;
+use common::{Daylight, Scale, TileNumber, Zoom};
 use err_derive::Error;
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::str::FromStr;
 use std::time::Duration;
 use url::Url;
 
@@ -30,133 +28,6 @@ pub enum Error {
 
     #[error(display = "Failed to parse response as bytes: {}", _0)]
     ParseResponseBytes(reqwest::Error),
-}
-
-#[derive(Debug, Error)]
-#[error(display = "Failed to parse scale")]
-pub struct ScaleParseError;
-
-/// Size of a tile in pixels is scale * 256
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
-pub enum Scale {
-    /// x1 == 256 tile size
-    One,
-    /// x2 == 512 tile size
-    Two,
-    /// x5 == 1024 tile size
-    Four,
-}
-
-impl Default for Scale {
-    fn default() -> Self {
-        Scale::One
-    }
-}
-
-impl Scale {
-    pub fn tile_size(&self) -> u32 {
-        match self {
-            Scale::One => 256,
-            Scale::Two => 512,
-            Scale::Four => 1024,
-        }
-    }
-}
-
-impl Scale {
-    fn query_pair(&self) -> (&'static str, &'static str) {
-        match self {
-            Scale::One => ("scale", "1"),
-            Scale::Two => ("scale", "2"),
-            Scale::Four => ("scale", "4"),
-        }
-    }
-}
-
-impl FromStr for Scale {
-    type Err = ScaleParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "1" => Ok(Scale::One),
-            "2" => Ok(Scale::Two),
-            "4" => Ok(Scale::Four),
-            _ => Err(ScaleParseError),
-        }
-    }
-}
-
-#[derive(Debug, Error)]
-#[error(display = "Failed to parse daylight")]
-pub struct DaylighParseError;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
-pub enum Daylight {
-    Night,
-    Day,
-}
-
-impl Daylight {
-    fn query_pair(&self) -> (&'static str, &'static str) {
-        match self {
-            Daylight::Night => ("daylight", "0"),
-            Daylight::Day => ("daylight", "1"),
-        }
-    }
-}
-
-impl FromStr for Daylight {
-    type Err = DaylighParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "night" => Ok(Daylight::Night),
-            "day" => Ok(Daylight::Day),
-            _ => Err(DaylighParseError),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize)]
-pub struct Zoom(u8);
-
-impl Zoom {
-    pub const MIN: Zoom = Zoom(1);
-    pub const MAX: Zoom = Zoom(18);
-
-    pub fn new_clamped(z: u8) -> Self {
-        Zoom(z.clamp(Self::MIN.0, Self::MAX.0))
-    }
-
-    pub const fn get(&self) -> u8 {
-        self.0
-    }
-}
-
-impl From<u8> for Zoom {
-    fn from(z: u8) -> Self {
-        Zoom::new_clamped(z)
-    }
-}
-
-impl From<Zoom> for u8 {
-    fn from(z: Zoom) -> Self {
-        z.0
-    }
-}
-
-impl FromStr for Zoom {
-    type Err = std::num::ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Zoom::new_clamped(s.parse::<u8>()?))
-    }
-}
-
-impl fmt::Display for Zoom {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }
 
 #[derive(Debug)]
@@ -209,11 +80,15 @@ impl OsmClient {
         self.update_base_url_query_pairs();
     }
 
-    // TODO - newtype units
-    pub fn request_tile(&self, x: u32, y: u32, zoom: Zoom) -> Result<Bytes, Error> {
-        let z = zoom.0.to_string();
-        let x = x.to_string();
-        let y = y.to_string();
+    pub fn request_tile<T: Into<TileNumber>, Z: Into<Zoom>>(
+        &self,
+        x: T,
+        y: T,
+        zoom: Z,
+    ) -> Result<Bytes, Error> {
+        let z = zoom.into().to_string();
+        let x = x.into().to_string();
+        let y = y.into().to_string();
         let mut base = self.server_url.clone();
         let url = base
             .query_pairs_mut()
@@ -236,11 +111,11 @@ impl OsmClient {
     fn update_base_url_query_pairs(&mut self) {
         self.server_url.query_pairs_mut().clear();
         if let Some(daylight) = &self.daylight {
-            let qp = daylight.query_pair();
+            let qp = daylight.url_query_pair();
             self.server_url.query_pairs_mut().append_pair(qp.0, qp.1);
         }
         if let Some(scale) = &self.scale {
-            let qp = scale.query_pair();
+            let qp = scale.url_query_pair();
             self.server_url.query_pairs_mut().append_pair(qp.0, qp.1);
         }
     }

@@ -1,5 +1,6 @@
 #![deny(warnings)]
 
+use common::{Daylight, Latitude, Longitude, Scale, Zoom};
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -53,7 +54,7 @@ pub struct Tiler {
     /// "2" => 512
     /// "4" => 1024
     #[serde(default)]
-    pub scale: Option<osm_client::Scale>,
+    pub scale: Option<Scale>,
     #[serde(default)]
     pub support_daynight: bool,
 }
@@ -70,16 +71,17 @@ pub struct Window {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ImuGps {
     /// Location relative to center of rear axle, [x, y, z] meters
-    pub mount_location: [f32; 3],
+    pub mount_location: [f64; 3],
     // TODO - orientation/rotation for alignment
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StartupDefaults {
-    pub daynight: osm_client::Daylight,
-    pub lat: f64,
-    pub lon: f64,
-    pub zoom: osm_client::Zoom,
+    pub daynight: Daylight,
+    // TODO - need to use the new_clamped() methods or do validation checks
+    pub zoom: Zoom,
+    pub latitude: Latitude,
+    pub longitude: Longitude,
 }
 
 impl FromStr for Config {
@@ -121,17 +123,17 @@ impl Config {
             },
             tiler: Tiler {
                 url: Url::parse("http://127.0.0.1:8553/v1/tile").unwrap(),
-                scale: Some(osm_client::Scale::Four),
+                scale: Some(Scale::Four),
                 support_daynight: true,
             },
             imu_gps: ImuGps {
                 mount_location: [0.0; 3],
             },
             startup_defaults: StartupDefaults {
-                daynight: osm_client::Daylight::Day,
-                lat: 47.453551,
-                lon: -116.788118,
-                zoom: osm_client::Zoom::new_clamped(11),
+                daynight: Daylight::Day,
+                zoom: Zoom::new_clamped(11),
+                latitude: Latitude(47.453551),
+                longitude: Longitude(-116.788118),
             },
         }
     }
@@ -168,20 +170,17 @@ mod tests {
             config.tiler.url,
             Url::parse("http://127.0.0.1:8553/v1/tile").unwrap()
         );
-        assert_eq!(config.tiler.scale, Some(osm_client::Scale::Four));
+        assert_eq!(config.tiler.scale, Some(Scale::Four));
         assert_eq!(config.tiler.support_daynight, true);
 
         assert_relative_eq!(config.imu_gps.mount_location[0], 0.0);
         assert_relative_eq!(config.imu_gps.mount_location[1], 0.0);
         assert_relative_eq!(config.imu_gps.mount_location[2], 0.0);
 
-        assert_eq!(config.startup_defaults.daynight, osm_client::Daylight::Day);
-        assert_relative_eq!(config.startup_defaults.lat, 47.453551);
-        assert_relative_eq!(config.startup_defaults.lon, -116.788118);
-        assert_eq!(
-            config.startup_defaults.zoom,
-            osm_client::Zoom::new_clamped(11)
-        );
+        assert_eq!(config.startup_defaults.daynight, Daylight::Day);
+        assert_eq!(config.startup_defaults.zoom, Zoom::new_clamped(11));
+        assert_relative_eq!(config.startup_defaults.latitude.0, 47.453551);
+        assert_relative_eq!(config.startup_defaults.longitude.0, -116.788118);
 
         assert_eq!(config, Config::sample_config());
     }

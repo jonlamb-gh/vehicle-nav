@@ -17,8 +17,8 @@ features=["serde"]
 version = "1.0"
 features=["derive"]
 
-[dependencies.osm-client]
-path = "../osm-client"
-
 [dev-dependencies]
 approx = "0.4"
+
+[dependencies.common]
+path = "../common"
