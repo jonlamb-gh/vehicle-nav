@@ -81,6 +81,20 @@ pub trait RaylibDraw {
         }
     }
 
+    /// Draws a line with thickness.
+    #[inline]
+    fn draw_line_ex(
+        &mut self,
+        start_pos: impl Into<ffi::Vector2>,
+        end_pos: impl Into<ffi::Vector2>,
+        thick: f32,
+        color: impl Into<ffi::Color>,
+    ) {
+        unsafe {
+            ffi::DrawLineEx(start_pos.into(), end_pos.into(), thick, color.into());
+        }
+    }
+
     /// Shows current FPS.
     #[inline]
     fn draw_fps(&mut self, x: i32, y: i32) {

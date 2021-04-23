@@ -2,9 +2,8 @@
 
 #![deny(warnings)]
 
-use crate::util::*;
 use bytes::Bytes;
-use common::{Coordinate, Zoom};
+use common::{util::*, Coordinate, Zoom};
 use err_derive::Error;
 use osm_client::OsmClient;
 use rayon::prelude::*;
@@ -29,17 +28,7 @@ pub struct Config {
     pub tile_size: u32,
 }
 
-// TODO - adjust these
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            width: 1024,
-            height: 1024,
-            tile_size: 1024,
-        }
-    }
-}
-
+// TODO - refactor, use stuff in common lib
 impl Config {
     pub(crate) fn x_to_px(&self, x_center: f64, x: f64) -> f64 {
         let px = (x - x_center) * self.tile_size as f64 + self.width as f64 / 2f64;
@@ -90,8 +79,8 @@ impl MapTiler {
     }
 
     pub fn request_tiles(&mut self, center: Coordinate, zoom: Zoom) -> Result<&Pixmap, Error> {
-        let x_center = lon_to_x(center.longitude.into(), zoom.get());
-        let y_center = lat_to_y(center.latitude.into(), zoom.get());
+        let x_center = lon_to_x(center.longitude, zoom);
+        let y_center = lat_to_y(center.latitude, zoom);
 
         let x_min = (x_center - (0.5 * self.config.width as f64 / self.config.tile_size as f64))
             .floor() as i32;
@@ -145,40 +134,6 @@ impl MapTiler {
         }
 
         Ok(&self.image)
-    }
-}
-
-pub mod util {
-    use std::f64::consts::PI;
-
-    pub fn lon_to_x(mut lon: f64, zoom: u8) -> f64 {
-        if !(-180_f64..180_f64).contains(&lon) {
-            lon = (lon + 180_f64) % 360_f64 - 180_f64;
-        }
-
-        ((lon + 180_f64) / 360_f64) * 2_f64.powi(zoom.into())
-    }
-
-    pub fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
-        if !(-90_f64..90_f64).contains(&lat) {
-            lat = (lat + 90_f64) % 180_f64 - 90_f64;
-        }
-
-        (1_f64 - ((lat * PI / 180_f64).tan() + 1_f64 / (lat * PI / 180_f64).cos()).ln() / PI)
-            / 2_f64
-            * 2_f64.powi(zoom.into())
-    }
-
-    pub fn y_to_lat(y: f64, zoom: u8) -> f64 {
-        (PI * (1_f64 - 2_f64 * y / 2_f64.powi(zoom.into())))
-            .sinh()
-            .atan()
-            / PI
-            * 180_f64
-    }
-
-    pub fn x_to_lon(x: f64, zoom: u8) -> f64 {
-        x / 2_f64.powi(zoom.into()) * 360_f64 - 180_f64
     }
 }
 

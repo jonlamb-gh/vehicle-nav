@@ -11,6 +11,7 @@ const BACKGROUND_TEXTURE_PNG_BYTES: &'static [u8; 59961] =
 pub struct GuiResources {
     pub background_texture: Texture2D,
     pub map_texture: Option<Texture2D>,
+    // vehicle_marker_texture, could just be a primitive shape for now
 }
 
 impl GuiResources {

@@ -96,6 +96,15 @@ pub struct Coordinate {
     pub longitude: Longitude,
 }
 
+impl Coordinate {
+    pub fn new<Lat: Into<Latitude>, Lon: Into<Longitude>>(latitude: Lat, longitude: Lon) -> Self {
+        Coordinate {
+            latitude: latitude.into(),
+            longitude: longitude.into(),
+        }
+    }
+}
+
 impl From<(Latitude, Longitude)> for Coordinate {
     fn from(c: (Latitude, Longitude)) -> Self {
         Coordinate {
