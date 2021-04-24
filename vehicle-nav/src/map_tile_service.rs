@@ -44,10 +44,7 @@ pub struct MapTileServiceClient {
 }
 
 impl MapTileServiceClient {
-    pub fn new(
-        req_sender: Sender<GetTilesRequest>,
-        resp_recvr: Receiver<GetTilesResponse>,
-    ) -> Self {
+    fn new(req_sender: Sender<GetTilesRequest>, resp_recvr: Receiver<GetTilesResponse>) -> Self {
         MapTileServiceClient {
             req_sender,
             resp_recvr,

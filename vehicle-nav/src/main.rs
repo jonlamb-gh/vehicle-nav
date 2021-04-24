@@ -3,7 +3,9 @@
 use crate::gui_resources::GuiResources;
 use crate::map_tile_service::MapTileService;
 use crate::opts::Opts;
-use common::{Coordinate, CoordinateTransform};
+use crate::route_transform_service::RouteTransformService;
+use crate::zoom_delta_map::ZoomDeltaMap;
+use common::Coordinate;
 use config::Config;
 use raylib::prelude::*;
 use std::process;
@@ -20,7 +22,9 @@ use structopt::StructOpt;
 mod gui_resources;
 mod map_tile_service;
 mod opts;
+mod route_transform_service;
 mod thread;
+mod zoom_delta_map;
 
 // links for the README
 // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -35,7 +39,14 @@ mod thread;
 //   * add client timeout
 //   * line color(s)
 // - cli opts accept env vars
+// - rm/cleanup all the log::debug's
 //
+// - need to tune/revisit the bounded channel sizes/capacity, add config items
+// - same with the thread error types, probably just do strings for the hard errors,
+//   some stuff is tolerable
+// - iron out the error handling patterns with the threads
+// - timeout on the shutdown recvrs
+// - some of the services don't need a cloned Config, just a ref will do
 
 // main
 // does all the GUI stuff with raylib
@@ -65,13 +76,14 @@ mod thread;
 // probably hold off on this one until the sensor and routing bits are in order
 // figure out when and how often to store/manage the data
 
-// RouteTrackerService thread
+// RouteTransformService thread
 // in-mem, ring buffer maybe
 // holds the N most recent coordinates
-// and another buffer for the converted screen coordinates, maybe, so it's not converted on each
-// draw loop
+// send converted coords in batches to main, main has buffer of converted cords,
+// mains buffer gets cleared when map changes, requests updated stuff
 // only need to re-compute when a new map texture/image is recvd/changed
 // probably knows about zoom, tolerance filter to reduce nearby points, omit offscreen points, etc
+// support multiple routes, RouteId, colored/etc
 
 fn main() {
     match do_main() {
@@ -108,7 +120,11 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::load(&opts.config)?;
 
+    let zoom_delta_map = ZoomDeltaMap::new(&config);
+
     let (map_client, map_shutdown_handle) = MapTileService::start(config.clone())?;
+    let (route_transform_client, route_transform_shutdown_handle) =
+        RouteTransformService::start(config.clone())?;
 
     let screen_width = config.window.width.into();
     let screen_height = config.window.height.into();
@@ -129,7 +145,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let mut resources = GuiResources::load(&mut rl, &rl_t)?;
 
-    // one of the services should convert the Coordinates to screen/texture points
+    // these would come from the sensor service
     let route_coords: Vec<Coordinate> = vec![
         Coordinate::new(47.453551, -116.788118),
         Coordinate::new(47.453358, -116.787340),
@@ -143,23 +159,12 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
         Coordinate::new(47.456655, -116.783225),
     ];
 
-    // TODO - input stuff needs to update this
-    let mut transform = CoordinateTransform::new(
-        &center_coord,
-        config.tiler.scale.unwrap_or_default(),
-        zoom,
-        config.window.width.into(),
-        config.window.height.into(),
-    );
+    // TODO - manage this somewhere
+    let mut route_points: Vec<ffi::Vector2> = Vec::with_capacity(route_coords.len());
 
-    pub const ROUTE_COLOR: ffi::Color = ffi::Color {
-        r: 255,
-        g: 0,
-        b: 0,
-        a: 255,
-    };
-
-    let mut route_points: Vec<ffi::Vector2> = Vec::with_capacity(32);
+    for c in route_coords.into_iter() {
+        route_transform_client.push_coordinate(c)?;
+    }
 
     loop {
         let should_close = running.load(Ordering::SeqCst) != 0 || rl.window_should_close();
@@ -167,31 +172,29 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        // TODO - use arrow keys to move center lat/lon
-        // use asdf to move origin around with path waypoints
-        // maybe add a helper method on Coordinate, for shift/inc/dec stuff
-        // also add saturating_add/sub with clamps
-        // coord shift is a function of zoom, constant distince in pixels, put that dist in the
-        // config
-        //
-        // need to update transform stuff
+        // coord shift is a function of zoom, constant distince in pixels,
+        // put that dist in the config
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_M) {
             map_client.request(center_coord, zoom)?;
         }
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_UP) {
-            center_coord.latitude.saturating_add(0.001);
+            let (d_lat, _) = zoom_delta_map.get(zoom);
+            center_coord.latitude.saturating_add(d_lat);
             map_client.request(center_coord, zoom)?;
         }
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_DOWN) {
-            center_coord.latitude.saturating_sub(0.001);
+            let (d_lat, _) = zoom_delta_map.get(zoom);
+            center_coord.latitude.saturating_sub(d_lat);
             map_client.request(center_coord, zoom)?;
         }
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_RIGHT) {
-            center_coord.longitude.saturating_add(0.001);
+            let (_, d_lon) = zoom_delta_map.get(zoom);
+            center_coord.longitude.saturating_add(d_lon);
             map_client.request(center_coord, zoom)?;
         }
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_LEFT) {
-            center_coord.longitude.saturating_sub(0.001);
+            let (_, d_lon) = zoom_delta_map.get(zoom);
+            center_coord.longitude.saturating_sub(d_lon);
             map_client.request(center_coord, zoom)?;
         }
         if rl.is_key_pressed(ffi::KeyboardKey::KEY_I) {
@@ -205,29 +208,25 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
         if let Some(map_pixmap) = map_client.try_recv()? {
             log::debug!("Got pixmap");
+
+            route_points.clear();
+            route_transform_client.get_route(center_coord, zoom)?;
+
             let mut map_image = Image::from(&map_pixmap);
             map_image.resize(screen_width, screen_height);
             let _ = resources
                 .map_texture
                 .replace(rl.load_texture_from_image(&rl_t, &map_image)?);
+        }
 
-            // TODO - move the "rebuild route" stuff somewhere
-            // not sure about pre-allocated vec stuff and collect
-            transform.update(&center_coord, zoom);
-            route_points = route_coords
-                .iter()
-                .map(|c| {
-                    let (x, y) = transform.coordinate_to_pixel(c);
-                    ffi::Vector2 {
-                        x: x as _,
-                        y: y as _,
-                    }
-                })
-                .collect();
+        if let Some(mut route) = route_transform_client.try_recv()? {
+            log::debug!("Got route len={}", route.route_chunk.len());
+            route_points = route.route_chunk.drain(..).collect();
         }
 
         let mut dh = rl.begin_drawing(&rl_t);
 
+        // TODO - consider clearing ealier on, route stuff gets messed up on quick changes
         dh.clear_background(GuiResources::BG_COLOR);
 
         let foreground_texture = match &resources.map_texture {
@@ -247,13 +246,14 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
         // line size should be a function of zoom
         for pair in route_points.windows(2) {
-            dh.draw_line_ex(pair[0], pair[1], 2.0, ROUTE_COLOR);
+            dh.draw_line_ex(pair[0], pair[1], 2.0, GuiResources::ROUTE_COLOR);
         }
 
         dh.draw_fps(25, 25);
     }
 
     map_shutdown_handle.blocking_shutdown()?;
+    route_transform_shutdown_handle.blocking_shutdown()?;
 
     log::debug!("Shutdown complete");
 

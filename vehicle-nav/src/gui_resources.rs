@@ -29,6 +29,14 @@ impl GuiResources {
         a: 255,
     };
 
+    // TODO - config, or based on route id
+    pub const ROUTE_COLOR: ffi::Color = ffi::Color {
+        r: 255,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+
     pub fn load(
         rh: &mut RaylibHandle,
         rl_t: &RaylibThread,

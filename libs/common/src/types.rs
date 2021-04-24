@@ -21,12 +21,12 @@ impl Latitude {
         self.0
     }
 
-    pub fn saturating_add(&mut self, val: f64) {
-        self.0 = Self::new_clamped(self.0 + val).0;
+    pub fn saturating_add(&mut self, val: Latitude) {
+        self.0 = Self::new_clamped(self.0 + val.0).0;
     }
 
-    pub fn saturating_sub(&mut self, val: f64) {
-        self.0 = Self::new_clamped(self.0 - val).0;
+    pub fn saturating_sub(&mut self, val: Latitude) {
+        self.0 = Self::new_clamped(self.0 - val.0).0;
     }
 }
 
@@ -63,12 +63,12 @@ impl Longitude {
         self.0
     }
 
-    pub fn saturating_add(&mut self, val: f64) {
-        self.0 = Self::new_clamped(self.0 + val).0;
+    pub fn saturating_add(&mut self, val: Longitude) {
+        self.0 = Self::new_clamped(self.0 + val.0).0;
     }
 
-    pub fn saturating_sub(&mut self, val: f64) {
-        self.0 = Self::new_clamped(self.0 - val).0;
+    pub fn saturating_sub(&mut self, val: Longitude) {
+        self.0 = Self::new_clamped(self.0 - val.0).0;
     }
 }
 
